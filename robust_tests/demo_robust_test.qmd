@@ -1,0 +1,115 @@
+---
+title: "Robust Tests"
+author: "Qi"
+date: "`r Sys.Date()`"
+format: html
+execute: 
+  warning: false
+  message: false
+---
+
+```{r sandwich}
+# Load necessary packages
+# install.packages(c("sandwich", "car", "boot", "robust", "robustbase", "caret", "plm"))
+library(sandwich)
+library(car)
+library(boot)
+library(robust)
+library(robustbase)
+library(caret)
+library(plm)
+library(lmtest)
+```
+
+## Simulate the dataset
+
+```{r simulation}
+set.seed(123)
+n <- 100
+x1 <- rnorm(n, mean = 5, sd = 2)
+x2 <- rnorm(n, mean = 10, sd = 3)
+y <- 3 + 2*x1 + 1.5*x2 + rnorm(n, mean = 0, sd = 2)
+mydata <- data.frame(y, x1, x2)
+head(mydata)
+```
+
+## Example with sandwich package (Robust Standard Errors)
+
+```{r}
+lm_model <- lm(y ~ x1 + x2, data = mydata)
+robust_se <- coeftest(lm_model, vcov = vcovHC(lm_model, type = "HC1"))
+print("Robust Standard Errors using sandwich package")
+print(robust_se)
+```
+
+## Example with car package (VIF)
+
+```{r vif}
+vif_values <- vif(lm_model)
+print("Variance Inflation Factor using car package")
+print(vif_values)
+```
+
+## Example with boot package (Bootstrapping)
+
+```{r bootstrap}
+boot_function <- function(data, indices) {
+  d <- data[indices, ]
+  lm_model <- lm(y ~ x1 + x2, data = d)
+  return(coef(lm_model))
+}
+boot_results <- boot(data = mydata, statistic = boot_function, R = 1000)
+print("Bootstrapping using boot package")
+print(boot_results)
+```
+
+## Example with robust package (Robust Linear Model)
+
+```{r robust_linear}
+rlm_model_robust <- robust::lmRob(y ~ x1 + x2, data = mydata)
+print("Robust Linear Model using robust package")
+print(summary(rlm_model_robust))
+```
+## Example with robustbase package (Robust Linear Model)
+```{r robustbase}
+rlm_model_robustbase <- robustbase::lmrob(y ~ x1 + x2, data = mydata)
+print("Robust Linear Model using robustbase package")
+print(summary(rlm_model_robustbase))
+```
+## Example with caret package (Cross-Validation)
+
+```{r caret}
+train_control <- trainControl(method = "cv", number = 10)
+model_caret <- train(y ~ x1 + x2, data = mydata, method = "lm", trControl = train_control)
+print("Cross-Validation using caret package")
+print(model_caret)
+summary(model_caret)
+```
+
+## Example with plm package (Panel Data Analysis with Robust Standard Errors)
+
+_Note_: For plm, we need to simulate panel data. We'll create a simple panel data example.
+
+```{r plm}
+set.seed(123)
+id <- rep(1:20, each = 5)
+time <- rep(1:5, times = 20)
+x1_panel <- rnorm(100, mean = 5, sd = 2)
+x2_panel <- rnorm(100, mean = 10, sd = 3)
+y_panel <- 3 + 2*x1_panel + 1.5*x2_panel + rnorm(100, mean = 0, sd = 2)
+panel_data <- data.frame(id, time, y = y_panel, x1 = x1_panel, x2 = x2_panel)
+head(panel_data)
+```
+
+
+
+```{r panel1}
+# Transform the data into a pdata.frame
+panel_data <- pdata.frame(panel_data, index = c("id", "time"))
+
+# Fit a panel model and calculate robust standard errors
+plm_model <- plm(y ~ x1 + x2, data = panel_data, model = "within")
+summary_plm <- summary(plm_model, vcovHC(plm_model, method = "arellano"))
+print("Panel Data Model with Robust Standard Errors using plm package")
+print(summary_plm)
+```

@@ -1,0 +1,95 @@
+---
+title: "Survey_related"
+author: "Qi"
+format: html
+---
+
+## Cronbach's alpha
+
+This is an indicator of the reliability of some items related to the same latent variable.
+
+```{r cronbach_1}
+library(psych)
+
+set.seed(42) #keep the same starting values
+#four congeneric measures
+r4 <- sim.congeneric()
+alpha(r4)
+```
+
+```{r cronbach_2}
+#nine hierarchical measures -- should actually use omega
+r9 <- sim.hierarchical()
+alpha(r9)
+```
+
+```{r cronbach_3}
+# examples of two independent factors that produce reasonable alphas
+# this is a case where alpha is a poor indicator of unidimensionality
+
+two.f <- sim.item(8)
+
+#specify which items to reverse key by name
+alpha(two.f,keys=c("V3","V4","V5","V6"))
+cov.two <- cov(two.f)
+alpha(cov.two,check.keys=TRUE)
+```
+
+```{r cronbach_4}
+ #automatic reversal base upon first component
+alpha(two.f,check.keys=TRUE)    #note that the median is much less than the average R
+#this suggests (correctly) that the 1 factor model is probably wrong 
+#an example with discrete item responses  -- show the frequencies
+items <- sim.congeneric(N=500,short=FALSE,low=-2,high=2,
+        categorical=TRUE) #500 responses to 4 discrete items with 5 categories
+a4 <- alpha(items$observed)  #item response analysis of congeneric measures
+a4
+#summary just gives Alpha
+summary(a4)
+```
+
+```{r cronbach_5}
+alpha2r(alpha = .74,n.var=4)
+
+#because alpha.ci returns an invisible object, you need to print it
+print(alpha.ci(.74, 100,p.val=.05,n.var=4))
+```
+
+
+## Survey package
+
+```{r loading}
+library(survey)
+```
+
+We will use the _api_ data from the survey package.
+
+```{r data}
+# Load the example dataset
+data(api)
+head(apistrat)
+```
+
+```{r processing}
+# Create survey design object for the apistrat dataset
+api_design <- svydesign(
+  id = ~1,
+  strata = ~stype,
+  weights = ~pw,
+  data = apistrat,
+  fpc = ~fpc
+)
+
+# Calculate mean of the api00 variable
+mean_api00 <- svymean(~api00, design = api_design)
+print(mean_api00)
+
+# Fit a linear regression model
+model_api <- svyglm(api00 ~ ell + meals + mobility, design = api_design)
+summary(model_api)
+```
+
+```{r}
+
+```
+

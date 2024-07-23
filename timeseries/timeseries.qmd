@@ -1,0 +1,46 @@
+---
+title: "Time Series Analysis with STL Decomposition and ARIMA"
+author: "Qi"
+date: "2024-07-12"
+execute:
+  echo: false
+  warning: false
+format:
+  html 
+---
+  
+
+## Demo data
+
+```{r}
+# Load necessary libraries
+library(forecast)
+library(ggplot2)
+
+# Load the AirPassengers dataset
+data("AirPassengers")
+head(AirPassengers, 60)
+```
+
+
+## Perform STL decomposition
+```{r}
+stl_decomp <- stl(AirPassengers, s.window = "periodic")
+
+# Plot the decomposition
+plot(stl_decomp)
+```
+
+## Fit an ARIMA model to the decomposed data
+```{r}
+fit <- auto.arima(AirPassengers)
+
+# Print the summary of the ARIMA model
+summary(fit)
+
+# Forecast the next 24 months (2 years)
+forecasted <- forecast(fit, h = 24)
+
+# Plot the forecast
+plot(forecasted)
+```
