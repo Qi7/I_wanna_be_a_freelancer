@@ -1,0 +1,137 @@
+---
+title: "Causal Inference matching"
+format: html
+---
+
+## Intro
+
+This is one of my assignment of the course _A Crash Course in Causality: Inferring Causal Effects from Observational Data_ on Coursera. Module 3, Matching.
+
+## Running Code
+
+```{r loadLib}
+library(tableone)
+library(Matching)
+library(MatchIt)
+data(lalonde)
+```
+```{r}
+summary(lalonde)
+```
+
+To calculate the standardized mean difference.
+
+```{r sme}
+#| echo: false
+
+xvars = c('age', 'educ', 'black', 'hispan', 'married', 'nodegree', 're74', 're75')
+#look at a table 1
+table1<- CreateTableOne(vars=xvars,strata="treat", data=lalonde, test=FALSE)
+## include standardized mean difference (SMD)
+print(table1,smd=TRUE)
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+```{r}
+library(dplyr)
+
+result <- lalonde %>%
+  group_by(treat) %>%
+  summarize(mean_re78 = mean(re78, na.rm = TRUE))
+
+# Print the result
+print(result)
+
+result[2, 2] - result[1, 2]
+```
+
+## Fit a propensity score
+
+```{r propensityScore}
+mydata <- lalonde %>% 
+  mutate(black = race == 'black'
+         , hispan = race == 'hispan')
+psmodel<-glm(treat~age+educ+race+hispan+married+nodegree+re74+re75
+             , family=binomial()
+             , data=mydata)
+
+#show coefficients etc
+summary(psmodel)
+#create propensity score
+pscore<-psmodel$fitted.values
+
+summary(pscore)
+```
+
+## Propensity Score Matching
+
+```{r pmatching}
+set.seed(931139)
+
+psmatch<-Match(Tr=mydata$treat, M=1,X=pscore,replace=FALSE)
+
+names(psmatch)
+
+matched<-mydata[unlist(psmatch[c("index.treated","index.control")]), ]
+
+head(matched)
+
+#get standardized differences
+matchedtab1<-CreateTableOne(vars=xvars
+                            , strata="treat"
+                            , data=matched
+                            , test = FALSE)
+print(matchedtab1, smd = TRUE)
+```
+
+## Matching with a Caliper 
+
+```{r pmatchCaliper}
+set.seed(931139)
+
+psmatch_c <-Match(Tr=mydata$treat
+               , M=1
+               , X=pscore
+               , replace=FALSE
+               , caliper = 0.1)
+
+matched_c <- mydata[unlist(psmatch_c[c("index.treated","index.control")]), ]
+
+head(matched_c)
+```
+
+```{r smd_c}
+#get standardized differences
+matchedtab1_c <- CreateTableOne(vars=xvars
+                            , strata="treat"
+                            , data=matched_c
+                            , test = FALSE)
+print(matchedtab1_c, smd = TRUE)
+```
+
+```{r}
+result <- matched_c %>%
+  group_by(treat)%>%
+  summarize(mean_re78 = mean(re78, na.rm = TRUE))
+
+# Print the result
+print(result)
+
+result[2, 2] - result[1, 2]
+```
+
+## Paired t test
+```{r paired_t_test}
+#outcome analysis
+y_trt<-matched_c$re78[matched_c$treat==1]
+y_con<-matched_c$re78[matched_c$treat==0]
+
+#pairwise difference
+diffy<-y_trt-y_con
+
+#paired t-test
+t.test(diffy)
+```
+
+
