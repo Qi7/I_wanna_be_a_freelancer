@@ -1,0 +1,113 @@
+---
+title: "Inverse Probability of Treatment Weight Causal Analysis"
+author: "Qi"
+format: html
+---
+
+## Intro
+
+This code is provided as part of the data analysis project of the Coursera course __A Crash Course in Causality: Inferring Causal Effects from Observational Data__. It is specifically designed to perform an Inverse Probability of Treatment Weighting (IPTW) causal analysis.
+
+## The codes
+
+
+```{r loadLib}
+library(tableone)
+library(Matching)
+library(ipw)
+library(survey)
+```
+```{r loadData}
+library(MatchIt)
+library(dplyr)
+data(lalonde)
+# head(lalonde) 
+
+mydata <- lalonde %>% 
+  mutate(black = race == 'black'
+         , hispan = race == 'hispan')
+
+head(mydata)
+```
+```{r var}
+xvars = c("age", "educ", "black", "hispan",  "married", "nodegree", "re74", "re75")
+
+psmodel<-glm(treat~age+educ+black+hispan+married+nodegree+re74+re75
+             , family=binomial(link = "logit")
+             , data=mydata)
+
+#create propensity score
+pscore <- psmodel$fitted.values
+
+#create weights
+weight<-ifelse(mydata$treat==1
+               , 1/(pscore),1/(1-pscore))
+
+summary(weight)
+```
+```{r sme}
+#apply weights to data
+weighteddata<-svydesign(ids = ~ 1, data =mydata, weights = ~ weight)
+
+#weighted table 1
+weightedtable <-svyCreateTableOne(vars = xvars
+                                  , strata = "treat", 
+                                 data = weighteddata, test = FALSE)
+
+## Show table with SMD
+print(weightedtable, smd = TRUE)
+
+```
+
+You can add options to executable code like this 
+
+```{r iprwCausalEffect}
+#first fit propensity score model to get weights
+weightmodel<-ipwpoint(exposure= treat
+                      , family = "binomial"
+                      , link ="logit",
+          denominator= ~age+educ+black+hispan+married+nodegree+re74+re75
+          , data=mydata)
+# numeric summary of weights
+summary(weightmodel$ipw.weights)
+# plot of weights
+ipwplot(weights = weightmodel$ipw.weights, logscale = FALSE,
+         main = "weights"
+        , xlim = c(0, 35)
+        )
+
+mydata$wt<-weightmodel$ipw.weights
+
+# fit a marginal structural model (risk difference)
+msm <- (svyglm(re78 ~ treat
+               , design = svydesign(~ 1, weights = ~wt,
+                  data =mydata)))
+coef(msm)
+confint(msm)
+```
+
+```{r weightTruncation}
+#first fit propensity score model to get weights
+weightmodel<-ipwpoint(exposure= treat
+                      , family = "binomial"
+                      , link ="logit",
+          denominator= ~age+educ+black+hispan+married+nodegree+re74+re75
+          , data=mydata
+          , trunc = .01)
+# numeric summary of weights
+summary(weightmodel$weights.trun)
+# plot of weights
+ipwplot(weights = weightmodel$weights.trun, logscale = FALSE,
+         main = "weights"
+        , xlim = c(0, 20)
+        )
+
+mydata$wt<-weightmodel$weights.trun
+
+# fit a marginal structural model (risk difference)
+msm <- (svyglm(re78 ~ treat
+               , design = svydesign(~ 1, weights = ~wt,
+                  data =mydata)))
+coef(msm)
+confint(msm)
+```
